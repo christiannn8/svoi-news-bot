@@ -1,0 +1,41 @@
+name: svoi-news
+on:
+  schedule:
+    - cron: "0 7 * * *"   # 10:00 Афины летом (UTC+3)
+    - cron: "0 8 * * *"   # 10:00 Афины зимой (UTC+2)
+  workflow_dispatch:
+    inputs:
+      dry_run:
+        description: "Не отправлять в Telegram, только показать пост"
+        default: "1"
+permissions:
+  contents: write
+concurrency: svoi-news
+jobs:
+  post:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with: { python-version: "3.12" }
+      - run: pip install -r requirements.txt pytest
+      - run: python -m pytest -q test_bot.py
+      - name: Пропуск, если сейчас не 10:00 в Афинах (двойной cron из-за DST)
+        id: gate
+        run: |
+          H=$(TZ=Europe/Athens date +%H)
+          echo "athens_hour=$H"
+          if [ "${{ github.event_name }}" = "schedule" ] && [ "$H" != "10" ]; then echo "skip=1" >> $GITHUB_OUTPUT; fi
+      - name: Бот
+        if: steps.gate.outputs.skip != '1'
+        env:
+          TELEGRAM_BOT_TOKEN: ${{ secrets.TELEGRAM_BOT_TOKEN }}
+          DEEPL_API_KEY: ${{ secrets.DEEPL_API_KEY }}
+          DRY_RUN: ${{ github.event_name == 'workflow_dispatch' && inputs.dry_run || '0' }}
+        run: python bot.py
+      - name: Сохранить posted.json
+        if: steps.gate.outputs.skip != '1'
+        run: |
+          git config user.name "svoi-news-bot"; git config user.email "bot@users.noreply.github.com"
+          git add posted.json
+          git diff --cached --quiet || (git commit -m "posted: обновление списка опубликованного" && git push)

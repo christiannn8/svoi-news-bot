@@ -1,0 +1,111 @@
+[
+ {
+  "name": "Минфин Греции",
+  "tier": "A",
+  "url": "https://minfin.gov.gr/feed/",
+  "lang": "el",
+  "hashtags": [
+   "#налоги",
+   "#закон"
+  ]
+ },
+ {
+  "name": "ОАСА (транспорт Афин)",
+  "tier": "A",
+  "url": "https://www.oasa.gr/feed/",
+  "lang": "el",
+  "hashtags": [
+   "#транспорт",
+   "#Афины"
+  ]
+ },
+ {
+  "name": "Регион Аттики",
+  "tier": "A",
+  "url": "https://www.patt.gov.gr/feed/",
+  "lang": "el",
+  "hashtags": [
+   "#Афины",
+   "#быт"
+  ]
+ },
+ {
+  "name": "Муниципалитет Элиника-Аргируполи",
+  "tier": "A",
+  "url": "https://www.elliniko-argyroupoli.gr/feed/",
+  "lang": "el",
+  "hashtags": [
+   "#юг_Афин",
+   "#быт"
+  ]
+ },
+ {
+  "name": "To Vima (английская версия)",
+  "tier": "B",
+  "url": "https://www.tovima.com/feed/",
+  "lang": "en",
+  "hashtags": [
+   "#Греция",
+   "#Афины",
+   "#недвижимость",
+   "#цены"
+  ]
+ },
+ {
+  "name": "Greek Reporter",
+  "tier": "B",
+  "url": "https://greekreporter.com/feed/",
+  "lang": "en",
+  "hashtags": [
+   "#Греция"
+  ]
+ },
+ {
+  "name": "Keep Talking Greece",
+  "tier": "B",
+  "url": "https://www.keeptalkinggreece.com/feed/",
+  "lang": "en",
+  "hashtags": [
+   "#Греция",
+   "#срочно"
+  ]
+ },
+ {
+  "name": "ProtoThema English",
+  "tier": "B",
+  "url": "https://en.protothema.gr/feed/",
+  "lang": "en",
+  "hashtags": [
+   "#Греция"
+  ]
+ },
+ {
+  "name": "Greek City Times",
+  "tier": "B",
+  "url": "https://greekcitytimes.com/category/greece/feed/",
+  "lang": "en",
+  "hashtags": [
+   "#Греция",
+   "#Афины"
+  ]
+ },
+ {
+  "name": "Tornos News",
+  "tier": "B",
+  "url": "https://www.tornosnews.gr/feed",
+  "lang": "el",
+  "hashtags": [
+   "#Греция"
+  ]
+ },
+ {
+  "name": "ERT News",
+  "tier": "B",
+  "url": "https://www.ertnews.gr/feed/",
+  "lang": "el",
+  "hashtags": [
+   "#Греция",
+   "#срочно"
+  ]
+ }
+]
