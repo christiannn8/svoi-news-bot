@@ -187,24 +187,26 @@ def main():
     if errs: log("ВАЛИДАЦИЯ НЕ ПРОЙДЕНА:", errs); sys.exit(1)
     print(post)
     if dry: log("DRY_RUN: не отправляю"); return
-    # Telegram не принимает запросы с серверов GitHub, поэтому шлём через пересыльщик на Netlify
-    relay = os.environ.get("TG_RELAY", "https://svoi-tg-relay.netlify.app/.netlify/functions/tg")
-    url = f"{relay}?method=sendMessage"
-    headers = {"x-bot-token": os.environ["TELEGRAM_BOT_TOKEN"].strip()}
+    tok = os.environ["TELEGRAM_BOT_TOKEN"].strip()
+    url = f"https://api.telegram.org/bot{tok}/sendMessage"
+    relay = os.environ.get("TG_RELAY")  # запасной путь, если понадобится
+    headers = {}
+    if relay: url, headers = f"{relay}?method=sendMessage", {"x-bot-token": tok}
     payload = dict(chat_id=CHAT_ID, message_thread_id=THREAD_ID, text=post, parse_mode="HTML",
                    disable_web_page_preview=True)
-    r = None
-    for attempt in (1, 2, 3):
+    r, deadline = None, time.time() + 15 * 60
+    while time.time() < deadline:
         try:
-            r = requests.post(url, json=payload, headers=headers, timeout=(15, 90))
-            if r.status_code == 429 and attempt < 3:
-                # лимит Telegram: сообщение не отправлено, ждём указанное время и повторяем
-                wait = int(r.json().get("parameters", {}).get("retry_after", 30)) + 2
-                log(f"Telegram 429: жду {wait}с"); time.sleep(min(wait, 120)); continue
-            break
+            r = requests.post(url, json=payload, headers=headers, timeout=(15, 120))
         except (requests.exceptions.ConnectTimeout, requests.exceptions.ConnectionError) as e:
             # соединение не установилось: сообщение точно не ушло, повтор безопасен
-            log(f"Telegram: попытка {attempt} не удалась ({type(e).__name__}), повторяю"); time.sleep(5)
+            log(f"Telegram: нет соединения ({type(e).__name__}), повтор через 30с"); r = None; time.sleep(30); continue
+        if r.status_code == 429:
+            # лимит Telegram: сообщение не отправлено, ждём и повторяем (до 15 минут)
+            try: wait = int(r.json().get("parameters", {}).get("retry_after", 30))
+            except Exception: wait = 30
+            log(f"Telegram 429: жду {wait + 5}с"); time.sleep(min(wait + 5, 120)); continue
+        break
     if r is None: log("Telegram: не удалось подключиться"); sys.exit(1)
     if not r.ok: log("Telegram:", r.status_code, r.text); sys.exit(1)
     state["posted"].append(dict(day=today, at=now.isoformat(), url_n=chosen["url_n"], link=chosen["link"],
