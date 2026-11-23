@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 """Бот новостей «Свои на юге Афин»: одна новость в день в ветку «Новости».
 Правила: см. RULES.md. Перевод только через DeepL, без ИИ-генерации."""
-import html, json, os, re, sys, time, datetime as dt
+import html, json, os, re, sys, time, unicodedata, datetime as dt
 from pathlib import Path
 from urllib.parse import urlsplit, urlunsplit, parse_qsl, urlencode
 import feedparser, requests
@@ -41,16 +41,25 @@ def strip_html(s):
     s = re.sub(r"<[^>]+>", " ", s)
     return re.sub(r"\s+", " ", html.unescape(s)).strip()
 
+def plain(s):
+    """нижний регистр без ударений: ΣΥΝΕΝΤΕΥΞΗ и συνέντευξη совпадают"""
+    s = unicodedata.normalize("NFD", s or "")
+    return "".join(ch for ch in s if unicodedata.category(ch) != "Mn").lower()
+
+JUNK = re.compile(r"σχετικο αρχειο|πραξη βεβαιωσης|προκηρυξη διαγωνισμ|διακηρυξη|συνεντευξ|interview|βιντεο|video:|live blog|podcast|ομιλια|speech|δηλωσ", re.I)
+QUOTE_TITLE = re.compile(r"^[^:«\"“]{3,70}:\s*[«\"“]")
+
 def sentences(text):
     text = BOILER.sub("", text).strip()
-    parts = re.split(r"(?<=[.!?;…])\s+(?=[A-ZА-ЯΑ-Ωα-ωA-Za-z0-9«\"“])", text)
+    parts = re.split(r"(?<=[.!?;…»”])\s+(?=[A-ZА-ЯΑ-Ωα-ωA-Za-z0-9«\"“])", text)
     return [p.strip() for p in parts if len(p.strip()) > 25]
 
-def trim(sents, limit=1000):
+def trim(sents, limit=700):
     out, n = [], 0
     for x in sents[:5]:
         if n + len(x) > limit and len(out) >= 4: break
-        out.append(x[:400]); n += len(x)
+        if len(x) > 300: continue  # слишком длинное «предложение» = склеенный текст
+        out.append(x); n += len(x)
     return out
 
 def tokens(ru_title):
@@ -111,8 +120,9 @@ def candidates(feeds, now, max_age_h=72):
                 tags = tags or [h for h in f["hashtags"] if h in ALLOWED and h not in ("#Греция", "#Афины", "#юг_Афин")]
             if not tags: continue
             if f["tier"] == "B" and not re.search(GREECE, blob): continue
-            if len(title) > 160 or re.search(r"ΣΧΕΤΙΚΟ ΑΡΧΕΙΟ|πράξη βεβαίωσης|προκήρυξη διαγωνισμ|διακήρυξη|συνέντευξη|interview|βίντεο|video:|live blog|podcast", blob[:400], re.I): continue
-            sents = trim(sentences(text))
+            if len(title) > 160 or JUNK.search(plain(blob)) or QUOTE_TITLE.search(title): continue  # интервью, речи, цитаты, документы
+            sents = [x for x in trim(sentences(text)) if x.count("«") + x.count("“") + x.count('"') < 2]
+            if sents and plain(sents[0])[:60] == plain(title)[:60]: sents = sents[1:]  # первое предложение = заголовок
             if len(sents) < 4: continue
             place = ["#Греция"]
             if re.search(ATHENS, head) or "#Афины" in f["hashtags"]: place.append("#Афины")

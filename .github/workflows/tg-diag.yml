@@ -1,0 +1,19 @@
+name: tg-diag
+on: workflow_dispatch
+jobs:
+  diag:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Проверка Telegram (токен в лог не попадает)
+        env:
+          T: ${{ secrets.TELEGRAM_BOT_TOKEN }}
+        run: |
+          api="https://api.telegram.org/bot$T"
+          echo "IP раннера: $(curl -s https://api.ipify.org)"
+          echo "--- getMe";          curl -s -m 40 "$api/getMe"; echo
+          echo "--- getWebhookInfo"; curl -s -m 40 "$api/getWebhookInfo"; echo
+          echo "--- getChat";        curl -s -m 40 "$api/getChat?chat_id=-1004436423996" | head -c 600; echo
+          echo "--- getChatMember (бот)"; id=$(curl -s -m 40 "$api/getMe" | python3 -c 'import sys,json;print(json.load(sys.stdin)["result"]["id"])')
+          curl -s -m 40 "$api/getChatMember?chat_id=-1004436423996&user_id=$id"; echo
+          echo "--- sendChatAction в ветку 4 (ничего не публикует)"
+          curl -s -m 60 -w ' [%{http_code}, %{time_total}s]' "$api/sendChatAction" -d chat_id=-1004436423996 -d message_thread_id=4 -d action=typing; echo

@@ -15,3 +15,9 @@ def test_validate_rejects():
     assert "нет ссылки" in bot.validate("текст\nИсточник: X\n#Греция", c)
     assert any("чужие" in e for e in bot.validate('<a href="http://x">x</a>\nИсточник: x\n#ИИ', c))
     assert "нет хэштегов" in bot.validate('<a href="http://x">x</a>\nИсточник: x', c)
+
+def test_interview_and_quote_titles_rejected():
+    import bot
+    assert bot.JUNK.search(bot.plain("ΣΥΝΕΝΤΕΥΞΗ ΤΟΥ ΥΠΟΥΡΓΟΥ ΣΤΗΝ ΕΦΗΜΕΡΙΔΑ"))
+    assert bot.QUOTE_TITLE.search("Κυριάκος Πιερρακάκης: «Κάθε πρόσθετο πλεόνασμα»")
+    assert not bot.QUOTE_TITLE.search("Νέα μέτρα για τα ενοίκια από 1η Ιανουαρίου")
