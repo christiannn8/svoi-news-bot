@@ -2,20 +2,16 @@ name: tg-diag
 on: workflow_dispatch
 jobs:
   diag:
-    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-latest, windows-latest, macos-latest]
+    runs-on: ${{ matrix.os }}
     steps:
-      - name: Проверка токена и Telegram (секретная часть токена в лог не попадает)
+      - name: getMe с разных серверов GitHub
+        shell: bash
         env:
           T: ${{ secrets.TELEGRAM_BOT_TOKEN }}
         run: |
-          python3 - <<'PY'
-          import os, re
-          t = os.environ.get("T", "")
-          print("длина:", len(t), "| пробелы/переносы:", bool(re.search(r"\s", t)))
-          print("формат 123456:ABC... (35 знаков):", bool(re.fullmatch(r"\d{6,12}:[A-Za-z0-9_-]{35}", t.strip())))
-          print("id бота в токене (публичный):", t.strip().split(":")[0] if ":" in t else "нет двоеточия", "| ожидается 9249365815")
-          PY
-          api="https://api.telegram.org/bot$(echo -n "$T" | tr -d '[:space:]')"
-          echo "IP раннера: $(curl -s https://api.ipify.org)"
-          for i in 1 2; do echo "--- getMe #$i"; curl -s -m 40 "$api/getMe"; echo; sleep 35; done
-          echo "--- getWebhookInfo"; curl -s -m 40 "$api/getWebhookInfo"; echo
+          echo "IP: $(curl -s -m 20 https://api.ipify.org)"
+          curl -s -m 40 -w ' [%{http_code} %{time_total}s]' "https://api.telegram.org/bot$(echo -n "$T" | tr -d '[:space:]')/getMe"; echo
