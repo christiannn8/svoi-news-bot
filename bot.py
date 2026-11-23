@@ -184,6 +184,10 @@ def main():
     for attempt in (1, 2, 3):
         try:
             r = requests.post(url, json=payload, timeout=(15, 90))
+            if r.status_code == 429 and attempt < 3:
+                # лимит Telegram: сообщение не отправлено, ждём указанное время и повторяем
+                wait = int(r.json().get("parameters", {}).get("retry_after", 30)) + 2
+                log(f"Telegram 429: жду {wait}с"); time.sleep(min(wait, 120)); continue
             break
         except (requests.exceptions.ConnectTimeout, requests.exceptions.ConnectionError) as e:
             # соединение не установилось: сообщение точно не ушло, повтор безопасен
