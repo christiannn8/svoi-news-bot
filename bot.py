@@ -187,13 +187,16 @@ def main():
     if errs: log("ВАЛИДАЦИЯ НЕ ПРОЙДЕНА:", errs); sys.exit(1)
     print(post)
     if dry: log("DRY_RUN: не отправляю"); return
-    url = f"https://api.telegram.org/bot{os.environ['TELEGRAM_BOT_TOKEN']}/sendMessage"
+    # Telegram не принимает запросы с серверов GitHub, поэтому шлём через пересыльщик на Netlify
+    relay = os.environ.get("TG_RELAY", "https://svoi-tg-relay.netlify.app/.netlify/functions/tg")
+    url = f"{relay}?method=sendMessage"
+    headers = {"x-bot-token": os.environ["TELEGRAM_BOT_TOKEN"].strip()}
     payload = dict(chat_id=CHAT_ID, message_thread_id=THREAD_ID, text=post, parse_mode="HTML",
                    disable_web_page_preview=True)
     r = None
     for attempt in (1, 2, 3):
         try:
-            r = requests.post(url, json=payload, timeout=(15, 90))
+            r = requests.post(url, json=payload, headers=headers, timeout=(15, 90))
             if r.status_code == 429 and attempt < 3:
                 # лимит Telegram: сообщение не отправлено, ждём указанное время и повторяем
                 wait = int(r.json().get("parameters", {}).get("retry_after", 30)) + 2
