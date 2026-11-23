@@ -177,9 +177,18 @@ def main():
     if errs: log("ВАЛИДАЦИЯ НЕ ПРОЙДЕНА:", errs); sys.exit(1)
     print(post)
     if dry: log("DRY_RUN: не отправляю"); return
-    r = requests.post(f"https://api.telegram.org/bot{os.environ['TELEGRAM_BOT_TOKEN']}/sendMessage",
-                      json=dict(chat_id=CHAT_ID, message_thread_id=THREAD_ID, text=post, parse_mode="HTML",
-                                disable_web_page_preview=False), timeout=30)
+    url = f"https://api.telegram.org/bot{os.environ['TELEGRAM_BOT_TOKEN']}/sendMessage"
+    payload = dict(chat_id=CHAT_ID, message_thread_id=THREAD_ID, text=post, parse_mode="HTML",
+                   disable_web_page_preview=True)
+    r = None
+    for attempt in (1, 2, 3):
+        try:
+            r = requests.post(url, json=payload, timeout=(15, 90))
+            break
+        except (requests.exceptions.ConnectTimeout, requests.exceptions.ConnectionError) as e:
+            # соединение не установилось: сообщение точно не ушло, повтор безопасен
+            log(f"Telegram: попытка {attempt} не удалась ({type(e).__name__}), повторяю"); time.sleep(5)
+    if r is None: log("Telegram: не удалось подключиться"); sys.exit(1)
     if not r.ok: log("Telegram:", r.status_code, r.text); sys.exit(1)
     state["posted"].append(dict(day=today, at=now.isoformat(), url_n=chosen["url_n"], link=chosen["link"],
                                 title_ru=chosen["title_ru"], tok=chosen_meta["tok"], nums=chosen_meta["nums"],
