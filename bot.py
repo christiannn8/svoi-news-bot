@@ -1,8 +1,8 @@
 #!/usr/bin/env python3
 """Бот новостей «Свои на юге Афин»: одна новость в день в ветку «Новости».
-Правила: см. RULES.md. Заголовок переводит DeepL. Пересказ и два пункта
-«Что это значит для вас» и «Что взять во внимание» пишет бесплатная модель GitHub Models
-строго по тексту статьи; если по статье сказать нечего, новость пропускается."""
+Правила: см. RULES.md. Заголовок переводит DeepL. Пересказ и пункты «Что это значит для вас»
+и «Что взять во внимание» пишет Claude (ежедневная задача): сначала запуск в режиме list показывает
+кандидатов, затем запуск с force_url и ai_json публикует выбранную статью. Без ai_json бот не публикует."""
 import html, json, os, re, sys, time, unicodedata, datetime as dt
 from pathlib import Path
 from urllib.parse import urlsplit, urlunsplit, parse_qsl, urlencode
@@ -147,36 +147,6 @@ def build_post(c, title_ru, ai):
             f"<b>Что это значит для вас:</b> {e(ai['meaning'])}\n\n"
             f"<b>Что взять во внимание:</b> {e(ai['attention'])}\n\n{src}\n{' '.join(tags)}")
 
-AI_RULES = """Ты редактор новостной ветки Telegram-сообщества «Свои на юге Афин» для русскоязычных людей,
-которые живут в Греции (юг Афин) или собираются переехать. По статье напиши на русском JSON:
-{"skip": false, "summary": "...", "meaning": "...", "attention": "..."}
-summary - пересказ новости ровно в 2-3 предложениях: что произошло, когда, где, кого касается.
-meaning - 1-2 предложения: что это значит для читателя, живущего в Греции, в его повседневной жизни.
-attention - ровно одно предложение: практический совет, что учесть или сделать.
-Жёсткие правила:
-- Только факты из статьи. Никаких цифр, дат, имён, мест, сроков и правил, которых нет в тексте.
-- meaning и attention должны прямо следовать из статьи; не придумывай последствий и советов, не связанных с текстом.
-- Нейтральный тон, без оценок, политики, эмоций и мнений. Без восклицательных знаков, без длинных тире (только короткий дефис), без эмодзи.
-- Названия ведомств и мест пиши по-русски, как принято (например, «Министерство финансов», «Аттика»).
-- Если из статьи нельзя честно вывести, что это значит для жителя Греции, верни {"skip": true, "reason": "..."}.
-Верни только JSON."""
-
-def gh_ai(c, token, forced=False):
-    rules = AI_RULES + ("\nЭту статью нужно опубликовать: skip не используй." if forced else "")
-    r = requests.post("https://models.github.ai/inference/chat/completions",
-                      headers={"Authorization": f"Bearer {token}", "Content-Type": "application/json",
-                               "Accept": "application/vnd.github+json", "X-GitHub-Api-Version": "2026-03-10"},
-                      json={"model": os.environ.get("AI_MODEL", "openai/gpt-4.1"), "temperature": 0.2,
-                                                        "messages": [{"role": "system", "content": rules},
-                                         {"role": "user", "content": f"Заголовок: {c['title']}\n\nТекст статьи:\n{c['text']}"}]},
-                      timeout=90)
-    if not r.ok: raise RuntimeError(f"GitHub Models {r.status_code}: {r.text[:300]}")
-    try: raw = (r.json()["choices"][0]["message"].get("content") or "").strip()
-    except Exception: raise RuntimeError(f"GitHub Models {r.status_code} {r.headers.get('content-type')}: {r.text[:300]!r}")
-    m = re.search(r"\{.*\}", raw, re.S)  # модель может обернуть JSON в ```json ... ```
-    if not m: raise RuntimeError(f"ответ модели не JSON: {raw[:300]!r}")
-    return json.loads(m.group(0))
-
 def nsent(t): return len([x for x in re.split(r"(?<=[.!?…])\s+", (t or "").strip()) if len(x) > 3])
 
 def check_ai(ai):
@@ -234,7 +204,9 @@ def main():
     history = [p for p in state["posted"] if (now - dt.datetime.fromisoformat(p["at"])).days <= 14 and p["url_n"] != force_url]
     seen_urls = {p["url_n"] for p in state["posted"]} - {force_url}
     key = os.environ.get("DEEPL_API_KEY", "")
-    ai_token = os.environ.get("GH_MODELS_TOKEN", "")
+    ai_json = os.environ.get("AI_JSON", "").strip()
+    list_only = os.environ.get("LIST_ONLY", "0") == "1"
+    if ai_json and not force_url: log("ai_json работает только вместе с force_url"); sys.exit(1)
     feeds = json.loads((HERE / "feeds.json").read_text())
     cands = [c for c in candidates(feeds, now, max_age_h=96 if force_url else 72) if c["url_n"] not in seen_urls]
     if force_url:
@@ -254,19 +226,28 @@ def main():
         if d and not force_url:
             log("ДУБЛЬ:", c["feed"]["name"], "|", c["title_ru"], "≈", d.get("title_ru")); continue
         kept.append(dict(tok=sorted(tok), nums=sorted(nums), title_ru=c["title_ru"]))
-        if tries >= 4: break
-        tries += 1
-        if not ai_token:
-            ai = {"summary": "[пересказ: нужен GH_MODELS_TOKEN]. Второе предложение.", "meaning": "[что значит].", "attention": "[во внимание]."}
+        if list_only:
+            print(json.dumps(dict(title_ru=c["title_ru"], title=c["title"], link=c["link"], source=c["feed"]["name"],
+                                  tier=c["feed"]["tier"], tags=c["tags"] + c["place"], pub=c["pub"], text=c["text"][:3000]),
+                             ensure_ascii=False))
+            tries += 1
+            if tries >= 6: break
+            continue
+        if not ai_json:
+            if dry:
+                ai = {"summary": "[пересказ]. [второе предложение].", "meaning": "[что значит].", "attention": "[во внимание]."}
+            else:
+                log("нет ai_json: публикация только через ежедневную задачу Claude"); sys.exit(0)
         else:
-            try: ai = gh_ai(c, ai_token, forced=bool(force_url))
-            except Exception as e: log("ИИ: ошибка", repr(e)[:300]); continue
-        errs = check_ai(ai) if ai_token else []
+            try: ai = json.loads(ai_json)
+            except Exception as e: log("ai_json не JSON:", e); sys.exit(1)
+        errs = check_ai(ai) if ai_json else []
         if errs: log("ПРОПУСК:", c["title_ru"], "|", errs); continue
         cand_post = build_post(c, c["title_ru"], ai)
         errs = validate(cand_post, c, mock=not key)
         if errs: log("ВАЛИДАЦИЯ НЕ ПРОЙДЕНА:", c["title_ru"], errs); continue
         post, chosen, chosen_meta = cand_post, c, kept[-1]; break
+    if list_only: return
     if not post: log("ни одна новость не прошла проверки"); sys.exit(1 if force_url else 0)
     print(post)
     if dry: log("DRY_RUN: не отправляю"); return

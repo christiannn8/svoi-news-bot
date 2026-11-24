@@ -1,8 +1,5 @@
 name: svoi-news
 on:
-  schedule:
-    - cron: "0 7 * * *"   # 10:00 Афины летом (UTC+3)
-    - cron: "0 8 * * *"   # 10:00 Афины зимой (UTC+2)
   workflow_dispatch:
     inputs:
       dry_run:
@@ -11,12 +8,17 @@ on:
       force_url:
         description: "Опубликовать именно эту статью (ссылка), даже если сегодня уже был пост"
         default: ""
+      ai_json:
+        description: "JSON с пунктами summary, meaning, attention (пишет Claude)"
+        default: ""
+      list_only:
+        description: "1 = только показать кандидатов, ничего не публиковать"
+        default: "0"
       delete_message_id:
         description: "Номер сообщения в ветке, которое удалить перед публикацией"
         default: ""
 permissions:
   contents: write
-  models: read
 concurrency: svoi-news
 jobs:
   post:
@@ -39,7 +41,8 @@ jobs:
         env:
           TELEGRAM_BOT_TOKEN: ${{ secrets.TELEGRAM_BOT_TOKEN }}
           DEEPL_API_KEY: ${{ secrets.DEEPL_API_KEY }}
-          GH_MODELS_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          AI_JSON: ${{ inputs.ai_json }}
+          LIST_ONLY: ${{ inputs.list_only }}
           FORCE_URL: ${{ github.event_name == 'workflow_dispatch' && inputs.force_url || '' }}
           DELETE_MESSAGE_ID: ${{ github.event_name == 'workflow_dispatch' && inputs.delete_message_id || '' }}
           DRY_RUN: ${{ github.event_name == 'workflow_dispatch' && inputs.dry_run || '0' }}
