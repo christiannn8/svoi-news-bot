@@ -33,3 +33,11 @@ def test_new_structure_and_ai_checks():
     assert bot.check_ai(ai) == []
     assert bot.check_ai(dict(ai, attention="Одно. Два.")) and bot.check_ai(dict(skip=True))
     assert bot.check_ai(dict(ai, summary="Только одно."))
+
+def test_places_vouliagmeni_valid():
+    import json, places
+    p = json.loads((places.PLACES / "vouliagmeni-lake" / "post.json").read_text())
+    assert places.check(p, {"posted": []}) == []
+    assert places.check(p, {"posted": [{"slug": "vouliagmeni-lake"}]}) == ["место уже публиковалось"]
+    bad = dict(p, caption=p["caption"].replace("#Вульягмени", "#озеро"))
+    assert any("неутверждённые" in e for e in places.check(bad, {"posted": []}))

@@ -1,0 +1,30 @@
+name: svoi-places
+on:
+  workflow_dispatch:
+    inputs:
+      slug: {description: "папка места в places/", required: false, default: ""}
+      dry_run: {description: "1 = только проверка", required: false, default: "1"}
+      delete_message_ids: {description: "id сообщений через запятую для удаления", required: false, default: ""}
+permissions:
+  contents: write
+concurrency: svoi-places
+jobs:
+  post:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with: {python-version: "3.12"}
+      - run: pip install -r requirements.txt
+      - run: python places.py
+        env:
+          TELEGRAM_BOT_TOKEN: ${{ secrets.TELEGRAM_BOT_TOKEN }}
+          PLACE_SLUG: ${{ inputs.slug }}
+          DRY_RUN: ${{ inputs.dry_run }}
+          DELETE_MESSAGE_IDS: ${{ inputs.delete_message_ids }}
+      - name: commit registry
+        if: inputs.dry_run != '1' && inputs.delete_message_ids == ''
+        run: |
+          git config user.name svoi-bot; git config user.email bot@users.noreply.github.com
+          git add places/registry.json
+          git diff --cached --quiet || (git commit -m "places: реестр обновлён" && git push)

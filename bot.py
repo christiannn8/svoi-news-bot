@@ -180,7 +180,10 @@ def tg(method, payload):
     r, deadline = None, time.time() + 15 * 60
     while time.time() < deadline:
         try:
-            r = requests.post(url, json=payload, timeout=(15, 120))
+            if "files" in payload:  # multipart: фото и альбомы
+                r = requests.post(url, data=payload["data"], files=payload["files"], timeout=(15, 180))
+            else:
+                r = requests.post(url, json=payload, timeout=(15, 120))
         except (requests.exceptions.ConnectTimeout, requests.exceptions.ConnectionError) as e:
             log(f"Telegram: нет соединения ({type(e).__name__}), повтор через 30с"); r = None; time.sleep(30); continue
         if r.status_code == 429:
