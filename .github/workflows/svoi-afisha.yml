@@ -1,0 +1,30 @@
+name: svoi-afisha
+on:
+  workflow_dispatch:
+    inputs:
+      issue: {description: "папка выпуска, например afisha/2026-11-26", required: true}
+      dry_run: {description: "1 = только проверка и обложка", required: false, default: "1"}
+permissions:
+  contents: write
+concurrency: svoi-afisha
+jobs:
+  post:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with: {python-version: "3.12"}
+      - run: pip install -r requirements.txt playwright && python -m playwright install --with-deps chromium
+      - run: python afisha.py
+        env:
+          TELEGRAM_BOT_TOKEN: ${{ secrets.TELEGRAM_BOT_TOKEN }}
+          ISSUE: ${{ inputs.issue }}
+          DRY_RUN: ${{ inputs.dry_run }}
+      - uses: actions/upload-artifact@v4
+        with: {name: cover, path: "${{ inputs.issue }}/cover.jpg"}
+      - name: commit registry
+        if: inputs.dry_run != '1'
+        run: |
+          git config user.name svoi-bot; git config user.email bot@users.noreply.github.com
+          git add afisha/registry.json
+          git diff --cached --quiet || (git commit -m "afisha: реестр" && git push)
