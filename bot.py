@@ -170,7 +170,8 @@ def gh_ai(c, token, forced=False):
                                          {"role": "user", "content": f"Заголовок: {c['title']}\n\nТекст статьи:\n{c['text']}"}]},
                       timeout=90)
     if not r.ok: raise RuntimeError(f"GitHub Models {r.status_code}: {r.text[:300]}")
-    raw = (r.json()["choices"][0]["message"].get("content") or "").strip()
+    try: raw = (r.json()["choices"][0]["message"].get("content") or "").strip()
+    except Exception: raise RuntimeError(f"GitHub Models {r.status_code} {r.headers.get('content-type')}: {r.text[:300]!r}")
     m = re.search(r"\{.*\}", raw, re.S)  # модель может обернуть JSON в ```json ... ```
     if not m: raise RuntimeError(f"ответ модели не JSON: {raw[:300]!r}")
     return json.loads(m.group(0))
