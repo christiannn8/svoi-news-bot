@@ -8,8 +8,15 @@ on:
       dry_run:
         description: "Не отправлять в Telegram, только показать пост"
         default: "1"
+      force_url:
+        description: "Опубликовать именно эту статью (ссылка), даже если сегодня уже был пост"
+        default: ""
+      delete_message_id:
+        description: "Номер сообщения в ветке, которое удалить перед публикацией"
+        default: ""
 permissions:
   contents: write
+  models: read
 concurrency: svoi-news
 jobs:
   post:
@@ -25,12 +32,16 @@ jobs:
         run: |
           H=$(TZ=Europe/Athens date +%H)
           echo "athens_hour=$H"
-          if [ "${{ github.event_name }}" = "schedule" ] && [ "$H" != "10" ]; then echo "skip=1" >> $GITHUB_OUTPUT; fi
+          # GitHub иногда запускает расписание с опозданием: окно 10:00-13:59, второй пост за день бот всё равно не сделает
+          if [ "${{ github.event_name }}" = "schedule" ] && { [ "$H" -lt 10 ] || [ "$H" -gt 13 ]; }; then echo "skip=1" >> $GITHUB_OUTPUT; fi
       - name: Бот
         if: steps.gate.outputs.skip != '1'
         env:
           TELEGRAM_BOT_TOKEN: ${{ secrets.TELEGRAM_BOT_TOKEN }}
           DEEPL_API_KEY: ${{ secrets.DEEPL_API_KEY }}
+          GH_MODELS_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          FORCE_URL: ${{ github.event_name == 'workflow_dispatch' && inputs.force_url || '' }}
+          DELETE_MESSAGE_ID: ${{ github.event_name == 'workflow_dispatch' && inputs.delete_message_id || '' }}
           DRY_RUN: ${{ github.event_name == 'workflow_dispatch' && inputs.dry_run || '0' }}
         run: python bot.py
       - name: Сохранить posted.json

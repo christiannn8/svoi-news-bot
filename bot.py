@@ -1,6 +1,8 @@
 #!/usr/bin/env python3
 """Бот новостей «Свои на юге Афин»: одна новость в день в ветку «Новости».
-Правила: см. RULES.md. Перевод только через DeepL, без ИИ-генерации."""
+Правила: см. RULES.md. Заголовок переводит DeepL. Пересказ и два пункта
+«Что это значит для вас» и «Что взять во внимание» пишет бесплатная модель GitHub Models
+строго по тексту статьи; если по статье сказать нечего, новость пропускается."""
 import html, json, os, re, sys, time, unicodedata, datetime as dt
 from pathlib import Path
 from urllib.parse import urlsplit, urlunsplit, parse_qsl, urlencode
@@ -130,16 +132,59 @@ def candidates(feeds, now, max_age_h=72):
             score = (3 if f["tier"] == "A" else 0) + len({"#аренда", "#недвижимость", "#документы", "#визы", "#налоги"} & set(tags)) * 2 \
                     + (1 if "#юг_Афин" in place else 0) - (now - pub).total_seconds() / 86400
             out.append(dict(feed=f, title=title, link=link, url_n=norm_url(link), pub=pub.isoformat(),
-                            sents=sents, tags=tags[:2], place=place, score=score))
+                            text=BOILER.sub("", text)[:6000], sents=sents, tags=tags[:2], place=place, score=score))
     return sorted(out, key=lambda c: -c["score"])
 
-def build_post(c, title_ru, body_ru):
+def dash(t):  # без длинных тире, как во всех текстах «Свои»
+    return re.sub(r"\s*[—–]\s*", " - ", (t or "").strip())
+
+def build_post(c, title_ru, ai):
     tags = [t for t in c["tags"] + c["place"] if t in ALLOWED]
-    note = " (по данным СМИ)" if c["feed"]["tier"] == "B" and TAXLAW & set(c["tags"]) else ""
+    note = " (по данным СМИ)" if c["feed"]["tier"] == "B" else ""
     src = f'Источник: <a href="{html.escape(c["link"], quote=True)}">{html.escape(c["feed"]["name"])}</a>{note}'
-    dash = lambda t: re.sub(r"\s*[—–]\s*", " - ", t.strip())  # без длинных тире, как во всех текстах «Свои»
-    title_ru, body_ru = dash(title_ru), dash(body_ru)
-    return f"📰 <b>{html.escape(title_ru.strip())}</b>\n\n{html.escape(body_ru.strip())}\n\n{src}\n{' '.join(tags)}"
+    e = lambda t: html.escape(dash(t))
+    return (f"📰 <b>{e(title_ru)}</b>\n\n{e(ai['summary'])}\n\n"
+            f"<b>Что это значит для вас:</b> {e(ai['meaning'])}\n\n"
+            f"<b>Что взять во внимание:</b> {e(ai['attention'])}\n\n{src}\n{' '.join(tags)}")
+
+AI_RULES = """Ты редактор новостной ветки Telegram-сообщества «Свои на юге Афин» для русскоязычных людей,
+которые живут в Греции (юг Афин) или собираются переехать. По статье напиши на русском JSON:
+{"skip": false, "summary": "...", "meaning": "...", "attention": "..."}
+summary - пересказ новости ровно в 2-3 предложениях: что произошло, когда, где, кого касается.
+meaning - 1-2 предложения: что это значит для читателя, живущего в Греции, в его повседневной жизни.
+attention - ровно одно предложение: практический совет, что учесть или сделать.
+Жёсткие правила:
+- Только факты из статьи. Никаких цифр, дат, имён, мест, сроков и правил, которых нет в тексте.
+- meaning и attention должны прямо следовать из статьи; не придумывай последствий и советов, не связанных с текстом.
+- Нейтральный тон, без оценок, политики, эмоций и мнений. Без восклицательных знаков, без длинных тире (только короткий дефис), без эмодзи.
+- Названия ведомств и мест пиши по-русски, как принято (например, «Министерство финансов», «Аттика»).
+- Если из статьи нельзя честно вывести, что это значит для жителя Греции, верни {"skip": true, "reason": "..."}.
+Верни только JSON."""
+
+def gh_ai(c, token, forced=False):
+    rules = AI_RULES + ("\nЭту статью нужно опубликовать: skip не используй." if forced else "")
+    r = requests.post("https://models.github.ai/inference/chat/completions",
+                      headers={"Authorization": f"Bearer {token}", "Content-Type": "application/json"},
+                      json={"model": os.environ.get("AI_MODEL", "openai/gpt-4.1"), "temperature": 0.2,
+                            "response_format": {"type": "json_object"},
+                            "messages": [{"role": "system", "content": rules},
+                                         {"role": "user", "content": f"Заголовок: {c['title']}\n\nТекст статьи:\n{c['text']}"}]},
+                      timeout=90)
+    r.raise_for_status()
+    return json.loads(r.json()["choices"][0]["message"]["content"])
+
+def nsent(t): return len([x for x in re.split(r"(?<=[.!?…])\s+", (t or "").strip()) if len(x) > 3])
+
+def check_ai(ai):
+    errs = []
+    if ai.get("skip"): return [f"модель пропустила: {ai.get('reason', '')}"]
+    for k in ("summary", "meaning", "attention"):
+        if not (ai.get(k) or "").strip(): errs.append(f"пусто: {k}")
+        if "!" in (ai.get(k) or ""): errs.append(f"восклицательный знак: {k}")
+    if not 2 <= nsent(ai.get("summary")) <= 3: errs.append("пересказ не 2-3 предложения")
+    if not 1 <= nsent(ai.get("meaning")) <= 2: errs.append("«что значит» не 1-2 предложения")
+    if nsent(ai.get("attention")) != 1: errs.append("«во внимание» не одно предложение")
+    return errs
 
 def validate(post, c, mock=False):
     errs = []
@@ -148,72 +193,90 @@ def validate(post, c, mock=False):
     if not tags: errs.append("нет хэштегов")
     bad = [t for t in tags if t not in ALLOWED]
     if bad: errs.append(f"чужие хэштеги {bad}")
-    if len(c["sents"]) < 4: errs.append("меньше 4 предложений")
     if len(post) > 4000: errs.append("длиннее лимита Telegram")
     if not mock and ("[en→ru]" in post or "[el→ru]" in post): errs.append("заглушка перевода")
+    for h in ("Что это значит для вас:", "Что взять во внимание:"):
+        if f"<b>{h}</b>" not in post: errs.append(f"нет пункта {h}")
     return errs
 
-def main():
-    dry = os.environ.get("DRY_RUN", "0") == "1"
-    now = dt.datetime.now(dt.timezone.utc)
-    state_p = HERE / "posted.json"
-    state = json.loads(state_p.read_text())
-    today = now.astimezone(dt.timezone(dt.timedelta(hours=2))).date().isoformat()
-    if not dry and any(p["day"] == today for p in state["posted"]) and not os.environ.get("FORCE"):
-        log("уже опубликовано сегодня"); return
-    history = [p for p in state["posted"] if (now - dt.datetime.fromisoformat(p["at"])).days <= 14]
-    seen_urls = {p["url_n"] for p in state["posted"]}
-    key = os.environ.get("DEEPL_API_KEY", "")
-    feeds = json.loads((HERE / "feeds.json").read_text())
-    cands = [c for c in candidates(feeds, now) if c["url_n"] not in seen_urls]
-    log(f"кандидатов: {len(cands)}")
-    pool = cands[:15]
-    if not pool: log("нечего публиковать"); sys.exit(0)
-    # заголовки одним запросом на русский: дедуп работает и между языками
-    for lang in ("el", "en"):
-        grp = [c for c in pool if c["feed"]["lang"] == lang]
-        if grp:
-            for c, t in zip(grp, deepl([c["title"] for c in grp], lang, key)): c["title_ru"] = t
-    chosen, kept = None, []
-    for c in pool:  # уже отсортированы: tier A и важные темы первыми, значит при дубле побеждает первоисточник
-        tok, nums = tokens(c["title_ru"]), numbers(c["title"])
-        d = is_dup(tok, nums, history + kept)
-        if d:
-            log("ДУБЛЬ:", c["feed"]["name"], "|", c["title_ru"], "≈", d.get("title_ru")); continue
-        kept.append(dict(tok=sorted(tok), nums=sorted(nums), title_ru=c["title_ru"]))
-        if chosen is None: chosen = c; chosen_meta = kept[-1]
-    if not chosen: log("все кандидаты - дубли"); sys.exit(0)
-    body_ru = deepl([" ".join(chosen["sents"])], chosen["feed"]["lang"], key)[0]
-    post = build_post(chosen, chosen["title_ru"], body_ru)
-    errs = validate(post, chosen, mock=not key)
-    if errs: log("ВАЛИДАЦИЯ НЕ ПРОЙДЕНА:", errs); sys.exit(1)
-    print(post)
-    if dry: log("DRY_RUN: не отправляю"); return
+def tg(method, payload):
+    """Запрос к Telegram с повтором при 429 (сообщение при 429 точно не отправлено), до 15 минут."""
     tok = os.environ["TELEGRAM_BOT_TOKEN"].strip()
-    url = f"https://api.telegram.org/bot{tok}/sendMessage"
-    relay = os.environ.get("TG_RELAY")  # запасной путь, если понадобится
-    headers = {}
-    if relay: url, headers = f"{relay}?method=sendMessage", {"x-bot-token": tok}
-    payload = dict(chat_id=CHAT_ID, message_thread_id=THREAD_ID, text=post, parse_mode="HTML",
-                   disable_web_page_preview=True)
+    url = f"https://api.telegram.org/bot{tok}/{method}"
     r, deadline = None, time.time() + 15 * 60
     while time.time() < deadline:
         try:
-            r = requests.post(url, json=payload, headers=headers, timeout=(15, 120))
+            r = requests.post(url, json=payload, timeout=(15, 120))
         except (requests.exceptions.ConnectTimeout, requests.exceptions.ConnectionError) as e:
-            # соединение не установилось: сообщение точно не ушло, повтор безопасен
             log(f"Telegram: нет соединения ({type(e).__name__}), повтор через 30с"); r = None; time.sleep(30); continue
         if r.status_code == 429:
-            # лимит Telegram: сообщение не отправлено, ждём и повторяем (до 15 минут)
             try: wait = int(r.json().get("parameters", {}).get("retry_after", 30))
             except Exception: wait = 30
             log(f"Telegram 429: жду {wait + 5}с"); time.sleep(min(wait + 5, 120)); continue
         break
     if r is None: log("Telegram: не удалось подключиться"); sys.exit(1)
+    return r
+
+def main():
+    dry = os.environ.get("DRY_RUN", "0") == "1"
+    force_url = norm_url(os.environ["FORCE_URL"]) if os.environ.get("FORCE_URL", "").strip() else ""
+    del_id = os.environ.get("DELETE_MESSAGE_ID", "").strip()
+    now = dt.datetime.now(dt.timezone.utc)
+    state_p = HERE / "posted.json"
+    state = json.loads(state_p.read_text())
+    today = now.astimezone(dt.timezone(dt.timedelta(hours=2))).date().isoformat()
+    if not dry and not force_url and any(p["day"] == today for p in state["posted"]) and not os.environ.get("FORCE"):
+        log("уже опубликовано сегодня"); return
+    history = [p for p in state["posted"] if (now - dt.datetime.fromisoformat(p["at"])).days <= 14 and p["url_n"] != force_url]
+    seen_urls = {p["url_n"] for p in state["posted"]} - {force_url}
+    key = os.environ.get("DEEPL_API_KEY", "")
+    ai_token = os.environ.get("GH_MODELS_TOKEN", "")
+    feeds = json.loads((HERE / "feeds.json").read_text())
+    cands = [c for c in candidates(feeds, now, max_age_h=96 if force_url else 72) if c["url_n"] not in seen_urls]
+    if force_url:
+        cands = [c for c in cands if c["url_n"] == force_url]
+        if not cands: log("статья FORCE_URL не найдена в лентах"); sys.exit(1)
+    log(f"кандидатов: {len(cands)}")
+    pool = cands[:15]
+    if not pool: log("нечего публиковать"); sys.exit(0)
+    for lang in ("el", "en"):  # заголовки одним запросом на русский: дедуп работает и между языками
+        grp = [c for c in pool if c["feed"]["lang"] == lang]
+        if grp:
+            for c, t in zip(grp, deepl([c["title"] for c in grp], lang, key)): c["title_ru"] = t
+    kept, post, chosen, chosen_meta, tries = [], None, None, None, 0
+    for c in pool:  # tier A и важные темы первыми, значит при дубле побеждает первоисточник
+        tok, nums = tokens(c["title_ru"]), numbers(c["title"])
+        d = is_dup(tok, nums, history + kept)
+        if d and not force_url:
+            log("ДУБЛЬ:", c["feed"]["name"], "|", c["title_ru"], "≈", d.get("title_ru")); continue
+        kept.append(dict(tok=sorted(tok), nums=sorted(nums), title_ru=c["title_ru"]))
+        if tries >= 4: break
+        tries += 1
+        if not ai_token:
+            ai = {"summary": "[пересказ: нужен GH_MODELS_TOKEN]. Второе предложение.", "meaning": "[что значит].", "attention": "[во внимание]."}
+        else:
+            try: ai = gh_ai(c, ai_token, forced=bool(force_url))
+            except Exception as e: log("ИИ: ошибка", repr(e)[:300]); continue
+        errs = check_ai(ai) if ai_token else []
+        if errs: log("ПРОПУСК:", c["title_ru"], "|", errs); continue
+        cand_post = build_post(c, c["title_ru"], ai)
+        errs = validate(cand_post, c, mock=not key)
+        if errs: log("ВАЛИДАЦИЯ НЕ ПРОЙДЕНА:", c["title_ru"], errs); continue
+        post, chosen, chosen_meta = cand_post, c, kept[-1]; break
+    if not post: log("ни одна новость не прошла проверки"); sys.exit(1 if force_url else 0)
+    print(post)
+    if dry: log("DRY_RUN: не отправляю"); return
+    if del_id:
+        r = tg("deleteMessage", dict(chat_id=CHAT_ID, message_id=int(del_id)))
+        log("удаление сообщения", del_id, ":", r.status_code, r.text[:200])
+        if r.ok: state["posted"] = [p for p in state["posted"] if str(p.get("message_id")) != del_id and p["url_n"] != chosen["url_n"]]
+    r = tg("sendMessage", dict(chat_id=CHAT_ID, message_thread_id=THREAD_ID, text=post, parse_mode="HTML",
+                               disable_web_page_preview=True))
     if not r.ok: log("Telegram:", r.status_code, r.text); sys.exit(1)
-    state["posted"].append(dict(day=today, at=now.isoformat(), url_n=chosen["url_n"], link=chosen["link"],
-                                title_ru=chosen["title_ru"], tok=chosen_meta["tok"], nums=chosen_meta["nums"],
-                                source=chosen["feed"]["name"], tags=chosen["tags"] + chosen["place"]))
+    state["posted"].append(dict(day=today, at=now.isoformat(), message_id=r.json()["result"]["message_id"],
+                                url_n=chosen["url_n"], link=chosen["link"], title_ru=chosen["title_ru"],
+                                tok=chosen_meta["tok"], nums=chosen_meta["nums"], source=chosen["feed"]["name"],
+                                tags=chosen["tags"] + chosen["place"]))
     state["posted"] = state["posted"][-200:]
     state_p.write_text(json.dumps(state, ensure_ascii=False, indent=1))
 
