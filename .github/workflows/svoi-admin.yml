@@ -1,0 +1,22 @@
+name: svoi-admin
+on:
+  workflow_dispatch:
+    inputs:
+      actions_file: {description: "файл действий, например admin/2026-11-24-afisha.json", required: false, default: ""}
+      dry_run: {description: "1 = только проверка", required: false, default: "1"}
+permissions:
+  contents: write
+concurrency: svoi-admin
+jobs:
+  post:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with: {python-version: "3.12"}
+      - run: pip install -r requirements.txt
+      - run: python admin.py
+        env:
+          TELEGRAM_BOT_TOKEN: ${{ secrets.TELEGRAM_BOT_TOKEN }}
+          ACTIONS_FILE: ${{ inputs.actions_file }}
+          DRY_RUN: ${{ inputs.dry_run }}
