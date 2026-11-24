@@ -164,7 +164,8 @@ attention - ровно одно предложение: практический
 def gh_ai(c, token, forced=False):
     rules = AI_RULES + ("\nЭту статью нужно опубликовать: skip не используй." if forced else "")
     r = requests.post("https://models.github.ai/inference/chat/completions",
-                      headers={"Authorization": f"Bearer {token}", "Content-Type": "application/json"},
+                      headers={"Authorization": f"Bearer {token}", "Content-Type": "application/json",
+                               "Accept": "application/vnd.github+json", "X-GitHub-Api-Version": "2026-03-10"},
                       json={"model": os.environ.get("AI_MODEL", "openai/gpt-4.1"), "temperature": 0.2,
                                                         "messages": [{"role": "system", "content": rules},
                                          {"role": "user", "content": f"Заголовок: {c['title']}\n\nТекст статьи:\n{c['text']}"}]},
