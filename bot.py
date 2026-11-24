@@ -166,12 +166,14 @@ def gh_ai(c, token, forced=False):
     r = requests.post("https://models.github.ai/inference/chat/completions",
                       headers={"Authorization": f"Bearer {token}", "Content-Type": "application/json"},
                       json={"model": os.environ.get("AI_MODEL", "openai/gpt-4.1"), "temperature": 0.2,
-                            "response_format": {"type": "json_object"},
-                            "messages": [{"role": "system", "content": rules},
+                                                        "messages": [{"role": "system", "content": rules},
                                          {"role": "user", "content": f"Заголовок: {c['title']}\n\nТекст статьи:\n{c['text']}"}]},
                       timeout=90)
-    r.raise_for_status()
-    return json.loads(r.json()["choices"][0]["message"]["content"])
+    if not r.ok: raise RuntimeError(f"GitHub Models {r.status_code}: {r.text[:300]}")
+    raw = (r.json()["choices"][0]["message"].get("content") or "").strip()
+    m = re.search(r"\{.*\}", raw, re.S)  # модель может обернуть JSON в ```json ... ```
+    if not m: raise RuntimeError(f"ответ модели не JSON: {raw[:300]!r}")
+    return json.loads(m.group(0))
 
 def nsent(t): return len([x for x in re.split(r"(?<=[.!?…])\s+", (t or "").strip()) if len(x) > 3])
 
