@@ -4,7 +4,7 @@
 Запуск: ACTIONS_FILE=admin/x.json [DRY_RUN=1] python admin.py"""
 import json, os, sys, pathlib
 from bot import tg, log, CHAT_ID
-ALLOWED = {"createForumTopic", "sendMessage", "pinChatMessage", "unpinChatMessage", "deleteMessage", "sendPhoto", "editForumTopic"}
+ALLOWED = {"createForumTopic", "sendMessage", "pinChatMessage", "unpinChatMessage", "deleteMessage", "sendPhoto", "editForumTopic", "editMessageText"}
 HERE = pathlib.Path(__file__).parent
 
 def subst(v, ctx):
