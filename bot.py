@@ -13,10 +13,10 @@ ALLOWED = ["#закон", "#налоги", "#аренда", "#недвижимо
            "#транспорт", "#быт", "#цены", "#срочно", "#Греция", "#Афины", "#юг_Афин"]
 TOPICS = {
  "#налоги": r"\btax|\baade\b|εφορ|φορολ|φόρο|φοροι|εισόδημα|income tax|vat\b|φπα",
- "#закон": r"\blaw\b|\bbill\b|legislat|parliament|ministerial decision|νόμο|νομοσχ|βουλή|υπουργική απόφαση|απόφαση",
+ "#закон": r"\blaw\b|\bbill\b|legislat|parliament|ministerial decision|νόμο|νομοσχ|βουλή|υπουργική απόφαση",
  "#аренда": r"\brent\b|rental|tenant|landlord|ενοίκ|μίσθωσ|airbnb|short-term",
  "#недвижимость": r"real estate|propert|housing|mortgage|apartment|ακίνητ|στέγαση|στεγαστικ|κατοικία|spiti mou|σπίτι μου",
- "#документы": r"passport|certificate|document|id card|afm|amka|πιστοποιητ|έγγραφ|ταυτότητα|αφμ|αμκα|gov\.gr",
+ "#документы": r"passport|certificate|residence permit|id card|afm|amka|πιστοποιητ|έγγραφ|ταυτότητα|αφμ|αμκα|gov\.gr",
  "#визы": r"\bvisa|residence permit|migrat|immigra|golden visa|asylum|βίζα|μετανάστ|άδεια διαμονής|άδειες διαμονής",
  "#транспорт": r"metro|\bbus\b|ferry|ferries|train|transport|airport|tram|taxi|μετρό|λεωφορ|συγκοινων|πλοί|τρένο|αεροδρόμ|οασα|στάση εργασίας",
  "#быт": r"electricity|water supply|utilit|school|hospital|health|garbage|ρεύμα|νερό|δήμο|σχολ|νοσοκομ|καθαριότητα|δεη",
@@ -137,6 +137,8 @@ def build_post(c, title_ru, body_ru):
     tags = [t for t in c["tags"] + c["place"] if t in ALLOWED]
     note = " (по данным СМИ)" if c["feed"]["tier"] == "B" and TAXLAW & set(c["tags"]) else ""
     src = f'Источник: <a href="{html.escape(c["link"], quote=True)}">{html.escape(c["feed"]["name"])}</a>{note}'
+    dash = lambda t: re.sub(r"\s*[—–]\s*", " - ", t.strip())  # без длинных тире, как во всех текстах «Свои»
+    title_ru, body_ru = dash(title_ru), dash(body_ru)
     return f"📰 <b>{html.escape(title_ru.strip())}</b>\n\n{html.escape(body_ru.strip())}\n\n{src}\n{' '.join(tags)}"
 
 def validate(post, c, mock=False):
