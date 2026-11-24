@@ -41,3 +41,10 @@ def test_places_vouliagmeni_valid():
     assert places.check(p, {"posted": [{"slug": "vouliagmeni-lake"}]}) == ["место уже публиковалось"]
     bad = dict(p, caption=p["caption"].replace("#Вульягмени", "#озеро"))
     assert any("неутверждённые" in e for e in places.check(bad, {"posted": []}))
+
+def test_people_checks():
+    import json, people
+    p = json.loads((people.HERE / "people" / "sample.json").read_text())
+    assert people.check(p, {"posted": []}) == []
+    assert any("уже публиковались" in e for e in people.check(p, {"posted": [{"ids": ["T1"]}]}))
+    assert any("восклицательный" in e for e in people.check(dict(p, text=p["text"] + "!"), {"posted": []}))
