@@ -1,0 +1,19 @@
+{
+  "slug": "little-kook",
+  "name": "Little Kook",
+  "category": "кофейня",
+  "area": "Псири (центр Афин)",
+  "south": false,
+  "photos": ["1.jpg", "2.jpg", "3.jpg", "4.jpg"],
+  "photo_sources": [
+    "https://commons.wikimedia.org/wiki/File:Little_Kook_05.jpg (CC BY-SA 4.0, Gveret Tered)",
+    "https://commons.wikimedia.org/wiki/File:Little_Kook_03.jpg (CC BY-SA 4.0, Gveret Tered)",
+    "https://commons.wikimedia.org/wiki/File:Little_Kook_08.jpg (CC BY-SA 4.0, Gveret Tered)",
+    "https://commons.wikimedia.org/wiki/File:Little_Kook_12.jpg (CC BY-SA 4.0, Gveret Tered)"
+  ],
+  "fact_sources": [
+    "https://littlekook.gr/ (сезонные темы, рождественская тема до 15 марта)",
+    "https://littlekook.gr/visit-us-contact/ (адрес Караискаки 17, часы 09:00-00:00, без бронирования)"
+  ],
+  "caption": "🧁 <b>Little Kook</b>\n\nСказочная кофейня в Псири, в паре минут пешком от Монастираки. Фасад, залы и кусок улицы вокруг оформлены как декорации, и тема меняется по сезонам: Хэллоуин, весна-лето, Рождество. Сейчас идёт рождественская, по сайту кафе она продлится до 15 марта.\n\n<b>Совет от своих:</b> столики здесь не бронируют, а вечером и в выходные у входа бывает очередь. С детьми удобнее прийти утром в будний день, а на огни фасада посмотреть уже в темноте.\n\n<b>Часы:</b> ежедневно 09:00-00:00, адрес Караискаки 17. Подробности: littlekook.gr\n\n📍 <a href=\"https://www.google.com/maps/search/?api=1&query=Little+Kook+Karaiskaki+17+Athens\">Открыть в Google Maps</a>\n\nФото: Wikimedia Commons, Gveret Tered (CC BY-SA 4.0)\n\n#кофе #Афины"
+}
