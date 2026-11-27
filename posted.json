@@ -97,6 +97,41 @@
     "#срочно",
     "#Греция"
    ]
+  },
+  {
+   "day": "2026-11-27",
+   "at": "2026-11-27T07:51:09.609182+00:00",
+   "message_id": 46,
+   "url_n": "https://en.protothema.gr/2026/11/27/storms-batter-thesprotia-prompting-150-emergency-calls-for-flooding-and-rescues-how-the-weather-will-develop-until-sunday",
+   "link": "https://en.protothema.gr/2026/11/27/storms-batter-thesprotia-prompting-150-emergency-calls-for-flooding-and-rescues-how-the-weather-will-develop-until-sunday/",
+   "title_ru": "На Теспротию обрушились штормы, в результате чего поступило 150 экстренных вызовов, связанных с наводнениями и спасательными операциями — Какая погода ожидается до воскресенья",
+   "tok": [
+    "150",
+    "воскр",
+    "вызов",
+    "какая",
+    "навод",
+    "обруш",
+    "ожида",
+    "опера",
+    "погод",
+    "посту",
+    "резул",
+    "связа",
+    "спаса",
+    "теспр",
+    "чего",
+    "шторм",
+    "экстр"
+   ],
+   "nums": [
+    "150"
+   ],
+   "source": "ProtoThema English",
+   "tags": [
+    "#срочно",
+    "#Греция"
+   ]
   }
  ]
 }
