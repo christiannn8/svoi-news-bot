@@ -132,6 +132,37 @@
     "#срочно",
     "#Греция"
    ]
+  },
+  {
+   "day": "2026-11-28",
+   "at": "2026-11-28T07:51:24.445433+00:00",
+   "message_id": 49,
+   "url_n": "https://ertnews.gr/eidiseis/kairos-erxontai-xionia-kataigides-kai-thyellodeis-anemoi-10-mpofor-prognosi-apo-tin-olga-papavgouli",
+   "link": "https://www.ertnews.gr/eidiseis/kairos-erxontai-xionia-kataigides-kai-thyellodeis-anemoi-10-mpofor-prognosi-apo-tin-olga-papavgouli/",
+   "title_ru": "Погода: ожидаются снегопады, грозы и штормовые ветры силой 10 баллов по шкале Бофорта — прогноз от Ольги Папавгули",
+   "tok": [
+    "балло",
+    "бофор",
+    "ветры",
+    "грозы",
+    "ожида",
+    "ольги",
+    "папав",
+    "погод",
+    "прогн",
+    "силой",
+    "снего",
+    "шкале",
+    "шторм"
+   ],
+   "nums": [
+    "10"
+   ],
+   "source": "ERT News",
+   "tags": [
+    "#срочно",
+    "#Греция"
+   ]
   }
  ]
 }
